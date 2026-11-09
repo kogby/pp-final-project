@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Parallelizing the Sequential Agent Loop</title>
+  <meta name="description" content="15-418/618 final project, Fall 2026, Carnegie Mellon University. Jerry Chen and Ethan Chiu.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600&amp;display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <h1>Parallelizing the Sequential Agent Loop on Unified-Memory Personal Computers</h1>
+  <p class="byline">Jerry Chen (chinjuic) and Ethan Chiu (ethanchi)<br>
+    15-418/618 final project, Fall 2026, Carnegie Mellon University</p>
+  <p class="muted"><a href="https://kogby.github.io/pp-final-project/">https://kogby.github.io/pp-final-project/</a></p>
+
+  <figure>
+    <svg viewBox="0 0 680 150" role="img" aria-label="Two agent steps. Run sequentially, each tool call waits for generation to finish and vice versa. Overlapped, tool calls start while the model is still generating, and the request finishes earlier.">
+      <text class="row-label" x="0" y="37">Sequential</text>
+      <rect class="bar-gpu" x="110" y="18" width="150" height="16"/>
+      <text class="bar-label" x="118" y="30">generate</text>
+      <rect class="bar-gpu" x="410" y="18" width="150" height="16"/>
+      <text class="bar-label" x="418" y="30">generate</text>
+      <rect class="bar-cpu" x="260" y="36" width="150" height="16"/>
+      <text class="bar-label" x="268" y="48">tool</text>
+      <rect class="bar-cpu" x="560" y="36" width="100" height="16"/>
+      <text class="bar-label" x="568" y="48">tool</text>
+
+      <text class="row-label" x="0" y="103">Overlapped</text>
+      <rect class="bar-gpu" x="110" y="84" width="150" height="16"/>
+      <text class="bar-label" x="118" y="96">generate</text>
+      <rect class="bar-gpu" x="370" y="84" width="150" height="16"/>
+      <text class="bar-label" x="378" y="96">generate</text>
+      <rect class="bar-cpu" x="220" y="102" width="150" height="16"/>
+      <text class="bar-label" x="228" y="114">tool</text>
+      <rect class="bar-cpu" x="490" y="102" width="100" height="16"/>
+      <text class="bar-label" x="498" y="114">tool</text>
+
+      <line class="guide" x1="590" y1="78" x2="590" y2="132"/>
+      <line class="guide" x1="660" y1="12" x2="660" y2="132"/>
+      <line class="span-line" x1="590" y1="130" x2="660" y2="130"/>
+      <text class="span-label" x="596" y="146">time saved</text>
+    </svg>
+    <figcaption><span class="swatch swatch-gpu"></span>LLM generation on the GPU <span class="swatch swatch-cpu swatch-next"></span>tool execution on the CPU. On a unified-memory machine, both share one memory pool.</figcaption>
+  </figure>
+
+  <h2>Summary</h2>
+  <p>We will parallelize the inherently sequential loop of a coding agent (LLM
+  generation → tool execution → LLM generation → …) by building a runtime that
+  overlaps CPU-side tool execution with GPU-side generation through pipelining
+  and speculative tool execution, and we will compare it against a sequential
+  replay of real agent traces. We target two unified-memory personal computers,
+  an NVIDIA GB10 (DGX Spark) and an Apple M5&nbsp;Pro laptop; inference runs on
+  <code>llama.cpp</code>, and the tools are real programs (<code>ripgrep</code>, a compiler, <code>pytest</code>,
+  <code>pandas</code>). Our central question is whether this parallelization still pays
+  off when the extra work competes with the critical path for the same memory
+  bandwidth and capacity (e.g., how accurate speculation must be to break even),
+  and we will use per-tool interference profiles to design unified-memory-aware
+  scheduling policies.</p>
+
+  <h2>Reports</h2>
+  <ul class="reports">
+    <li><span class="pending">Project proposal</span><span class="date">November 9</span></li>
+    <li><span class="pending">Milestone report</span><span class="date">due November 23</span></li>
+    <li><span class="pending">Final report</span><span class="date">due December 10</span></li>
+    <li><span class="pending">Poster session</span><span class="date">December 11</span></li>
+  </ul>
+
+  <h2>Updates</h2>
+  <!-- Add entries at the top: <li><strong>Month D:</strong> one or two sentences.</li> -->
+  <ul>
+    <li><strong>November 9:</strong> Proposal posted.</li>
+  </ul>
+
+  <footer>Last updated November 9, 2026.</footer>
+</main>
+</body>
+</html>
