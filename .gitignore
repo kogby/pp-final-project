@@ -1,2 +1,7 @@
 .DS_Store
 *.pdf
+!docs/proposal.pdf
+.venv/
+__pycache__/
+data/
+*.gguf
