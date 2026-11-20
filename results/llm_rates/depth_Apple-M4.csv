@@ -1,0 +1,7 @@
+phase,ctx,avg_ts,stddev_ts,host,model
+prefill,0,194.991088,0.928941,Apple-M4,Qwen3-8B-Q4_K_M
+decode,0,19.118258,0.030555,Apple-M4,Qwen3-8B-Q4_K_M
+prefill,4096,154.199688,0.341569,Apple-M4,Qwen3-8B-Q4_K_M
+decode,4096,16.495921,0.195886,Apple-M4,Qwen3-8B-Q4_K_M
+prefill,16384,76.412597,0.785005,Apple-M4,Qwen3-8B-Q4_K_M
+decode,16384,11.245774,0.037407,Apple-M4,Qwen3-8B-Q4_K_M

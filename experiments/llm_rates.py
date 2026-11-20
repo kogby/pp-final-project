@@ -49,7 +49,7 @@ def batched_sweep(model: Path, ctxs: list[int], npl: list[int]) -> pd.DataFrame:
                        "--output-format", "jsonl"])
     df = pd.DataFrame(rows)
     # t_tg: seconds to generate ntg tokens for all pl sequences -> per-step time.
-    df["step_ms"] = df.t_tg / df.n_tg * 1000
+    df["step_ms"] = df.t_tg / df.tg * 1000
     df["agg_tps"] = df.speed_tg
     return df[["n_kv_max", "pp", "pl", "step_ms", "agg_tps", "speed_pp"]].rename(
         columns={"pp": "ctx", "pl": "batch"})
@@ -95,6 +95,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", type=Path, default=MODEL)
     ap.add_argument("--quick", action="store_true", help="fewer points, for a smoke test")
+    ap.add_argument("--only", choices=["depth", "batched"], help="run one part; reuse saved CSV")
     a = ap.parse_args()
 
     depths = [0, 4096, 16384] if a.quick else [0, 2048, 4096, 8192, 16384, 32768]
@@ -104,14 +105,20 @@ def main() -> None:
     name = a.model.stem
 
     OUT.mkdir(parents=True, exist_ok=True)
-    depth = depth_sweep(a.model, depths, reps=2 if a.quick else 3).assign(host=tag, model=name)
-    depth.to_csv(OUT / f"depth_{tag}.csv", index=False)
-    print(depth.round(1).to_string(index=False))
-    rates_table(depth, name).assign(host=tag).to_csv(OUT / "rates.csv", index=False)
+    if a.only == "batched":
+        depth = pd.read_csv(OUT / f"depth_{tag}.csv")
+    else:
+        depth = depth_sweep(a.model, depths, reps=2 if a.quick else 3).assign(host=tag, model=name)
+        depth.to_csv(OUT / f"depth_{tag}.csv", index=False)
+        print(depth.round(1).to_string(index=False))
+        rates_table(depth, name).assign(host=tag).to_csv(OUT / "rates.csv", index=False)
 
-    batched = batched_sweep(a.model, ctxs, npl).assign(host=tag, model=name)
-    batched.to_csv(OUT / f"batched_{tag}.csv", index=False)
-    print(batched.round(1).to_string(index=False))
+    if a.only == "depth":
+        batched = pd.read_csv(OUT / f"batched_{tag}.csv")
+    else:
+        batched = batched_sweep(a.model, ctxs, npl).assign(host=tag, model=name)
+        batched.to_csv(OUT / f"batched_{tag}.csv", index=False)
+        print(batched.round(1).to_string(index=False))
     figures(depth, batched, tag)
 
 

@@ -24,20 +24,26 @@ One-step headroom bound 1.06x, unlimited 1.20x. Median end-of-request context is
 
 ## Phase 3 — Tool data cards (Nov 21–26)
 
-- [ ] Tool suite (`agentsched/toolsuite.py`): `rg`, `clang` build, `pytest`, `pandas`, and
+- [x] Tool suite (`agentsched/toolsuite.py`): `rg`, `clang` build, `pytest`, `pandas`, and
       synthetic tools (sleep, CPU loop, bandwidth kernel)
-- [ ] Profiler (`agentsched/profile.py`): CPU %, RSS, wall time, sampled during a run
+- [x] Profiler (`agentsched/profile.py`): CPU %, RSS, wall time, sampled during a run
 - [ ] Interference matrix: tool slowdown under decode, decode slowdown under tool
       (`experiments/interference.py`)
-- [ ] Map trace shell calls to suite tools by duration bucket (inputs are stripped in the trace)
+- [x] Map trace calls to suite tools (`TOOLMIX` in `agentsched/replay.py`); work-matched:
+      a call of recorded duration D runs round(D / d0) calibrated repetitions
+- [ ] Real-program tools (`grep`, `compile`, `build`, `test`) need `toolsuite setup`, which
+      clones llama.cpp and more-itertools into `data/workspace/` (not yet run)
+
+Bandwidth note (M4, 120 GB/s peak): one CPU thread running a STREAM triad reaches 78 GB/s,
+ten threads 91 GB/s. A single CPU tool can take most of the bandwidth decode needs.
 
 ## Phase 4 — Replay runtime (Nov 22–27)
 
-- [ ] `agentsched/replay.py`: asyncio, N sessions, each step = `llama-server` request with
+- [x] `agentsched/replay.py`: asyncio, N sessions, each step = `llama-server` request with
       the trace's new/output token counts (`ignore_eos`, `n_predict`), then the mapped tool
-- [ ] Event log per agent (step start/end, tool start/end) → timeline plot
+- [x] Event log per agent (step start/end, tool start/end) → timeline plot (`experiments/timeline.py`)
 - [ ] Correctness: same tokens per step and tool outputs alone vs in a group
-- [ ] **Ideal**: sum of isolated step and tool times along each trace (`agentsched/ideal.py`)
+- [x] **Ideal**: one Solo pass gives each request's isolated time (`experiments/scaling.py`)
 
 ## Phase 5 — Scaling study (Nov 26–Dec 2)
 
