@@ -219,17 +219,19 @@ class Agent:
             first = False
 
     async def tool_step(self, rid: int, i: int, step: Step) -> None:
+        tool = step.tool
+        assert tool is not None
         w0 = self.log.now()
-        await self.pol.before_tool(self.aid, step.tool)
+        await self.pol.before_tool(self.aid, tool)
         t0 = self.log.now()
         if t0 - w0 > 1e-3:
             self.log.add(agent=self.aid, rid=rid, step=i, kind="wait", t0=w0, t1=t0)
-        self.pol.tool_start(self.aid, step.tool)
+        self.pol.tool_start(self.aid, tool)
         try:
-            await run_tool(step.tool, step.reps)
+            await run_tool(tool, step.reps)
         finally:
-            self.pol.tool_end(self.aid, step.tool)
-        self.log.add(agent=self.aid, rid=rid, step=i, kind="tool", tool=step.tool,
+            self.pol.tool_end(self.aid, tool)
+        self.log.add(agent=self.aid, rid=rid, step=i, kind="tool", tool=tool,
                      reps=step.reps, t0=t0, t1=self.log.now())
 
     async def run(self, requests: list[Request]) -> None:
@@ -254,6 +256,15 @@ async def replay(url: str, per_agent: list[list[Request]], policy: Policy, shape
     finally:
         await client.close()
     return log.df()
+
+
+def tokens_match(solo: pd.DataFrame, log: pd.DataFrame) -> bool:
+    """Correctness: every step decodes the same number of tokens as in the solo run."""
+    def per_step(d):
+        d = d[d.kind.isin(["prefill", "decode"])]
+        return d.groupby(["rid", "step"]).n_decode.sum()
+    s, g = per_step(solo), per_step(log)
+    return bool(g.index.isin(s.index).all() and (g == s.loc[g.index]).all())
 
 
 def summarize(log: pd.DataFrame) -> dict:

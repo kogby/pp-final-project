@@ -25,8 +25,16 @@ uvx --from huggingface_hub hf download Qwen/Qwen3-8B-GGUF Qwen3-8B-Q4_K_M.gguf -
 ## Run
 
 ```bash
-uv run experiments/workload.py    # trace workload model + single-agent headroom
+uv run experiments/workload.py                      # trace workload model + headroom
+caffeinate -i uv run experiments/llm_rates.py       # prefill/decode/batched rates
+caffeinate -i uv run experiments/interference.py    # tool data cards
+cd experiments && caffeinate -i uv run scaling.py --n 1 2 4 8   # Solo/Naive/Stagger/Ideal sweep
+uv run experiments/timeline.py results/scaling/<host>/log_naive_N4.csv
+uv run pytest -q tests
 ```
+
+Results are written per host (`results/<study>/<host>/`). On laptops, run plugged in under
+`caffeinate`, and let the machine cool between sweeps.
 
 ## Deadlines
 

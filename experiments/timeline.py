@@ -16,7 +16,18 @@ from agentsched.plot import INK2, SERIES, plt, save
 COLORS = {"prefill": SERIES[6], "decode": SERIES[0], "tool": SERIES[1], "wait": "#c3c2b7"}
 
 
+def split_llm(log: pd.DataFrame) -> pd.DataFrame:
+    """Split each LLM call into prefill then decode using server-side timings;
+    any remainder (HTTP, queueing in the batch) is drawn as decode."""
+    llm = log[log.kind.isin(["prefill", "decode"])]
+    cut = (llm.t0 + llm.prefill_ms.fillna(0) / 1000).clip(upper=llm.t1)
+    pre = llm.assign(kind="prefill", t1=cut)
+    dec = llm.assign(kind="decode", t0=cut)
+    return pd.concat([log[~log.index.isin(llm.index)], pre, dec], ignore_index=True)
+
+
 def timeline(log: pd.DataFrame, title: str):
+    log = split_llm(log)
     agents = sorted(log.agent.unique())
     fig, ax = plt.subplots(figsize=(9, 0.45 * len(agents) + 1.2))
     for kind, c in COLORS.items():

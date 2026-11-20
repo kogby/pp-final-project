@@ -37,19 +37,37 @@ class Hogs:
         self.b = b
         self.samples: list[tuple[float, float, int]] = []
         self.stop = False
+        self.go = asyncio.Event()   # cleared = paused
+        self.go.set()
+        self.inflight = 0
 
     async def _one(self, slot: int) -> None:
         rng = np.random.default_rng(slot)
         ctx = rng.integers(1000, 30000, CTX).tolist()
         while not self.stop:
+            await self.go.wait()
+            self.inflight += 1
             t0 = time.perf_counter()
             r = await self.c.complete(ctx, CHUNK, slot=slot)
             self.samples.append((t0, time.perf_counter(), r["n_decode"]))
+            self.inflight -= 1
+
+    async def pause(self) -> None:
+        self.go.clear()
+        while self.inflight:
+            await asyncio.sleep(0.05)
 
     def rate(self, t0: float, t1: float) -> float:
-        """Aggregate decode tok/s over requests fully inside [t0, t1]."""
-        s = [(a, b, n) for a, b, n in self.samples if a >= t0 and b <= t1]
-        return sum(n for *_, n in s) / (t1 - t0) if s else float("nan")
+        """Aggregate decode tok/s in [t0, t1]; a request's tokens count in
+        proportion to how much of it overlaps the window."""
+        tok = sum(n * max(0.0, min(b, t1) - max(a, t0)) / (b - a)
+                  for a, b, n in self.samples if b > a)
+        return tok / (t1 - t0)
+
+    async def warmed(self, per_agent: int = 2) -> None:
+        """Wait until every hog finished its first prefill and a few decodes."""
+        while len(self.samples) < self.b * (per_agent + 1):
+            await asyncio.sleep(0.5)
 
     async def run(self) -> None:
         await asyncio.gather(*(self._one(i) for i in range(self.b)))
@@ -59,10 +77,17 @@ class Hogs:
 async def measure(url: str, b: int, tools: list[str], warm: float, base: float) -> list[dict]:
     hogs = Hogs(url, b)
     task = asyncio.create_task(hogs.run())
+    await hogs.warmed()
     await asyncio.sleep(warm)
     rows = []
     for name in tools:
         t = TOOLS[name]
+        # Paired in time: tool alone, decode alone, tool + decode. Drift
+        # (thermal throttling on fanless laptops) then cancels in the ratios.
+        await hogs.pause()
+        alone = await asyncio.to_thread(profile, t.argv, t.cwd)
+        hogs.go.set()
+        await asyncio.sleep(1)
         b0 = time.perf_counter()
         await asyncio.sleep(base)
         r_alone = hogs.rate(b0, time.perf_counter())
@@ -70,6 +95,7 @@ async def measure(url: str, b: int, tools: list[str], warm: float, base: float) 
         p = await asyncio.to_thread(profile, t.argv, t.cwd)
         t1 = time.perf_counter()
         rows.append({"tool": name, "batch": b, "tool_wall_s": p.wall_s,
+                     "tool_wall_paired_alone_s": alone.wall_s,
                      "decode_tps_alone": r_alone, "decode_tps_with_tool": hogs.rate(t0, t1)})
         print(rows[-1], flush=True)
     hogs.stop = True
@@ -99,7 +125,7 @@ def main() -> None:
     ap.add_argument("--tools", nargs="+", default=["sleep", "spin", "stream", "pandas"])
     ap.add_argument("--batch", type=int, nargs="+", default=[1, 4])
     ap.add_argument("--reps", type=int, default=3, help="alone runs per tool")
-    ap.add_argument("--warm", type=float, default=10)
+    ap.add_argument("--warm", type=float, default=3)
     ap.add_argument("--base", type=float, default=6, help="seconds of decode-only baseline")
     a = ap.parse_args()
 
@@ -122,7 +148,7 @@ def main() -> None:
 
     cards = pd.DataFrame(rows)
     cards = cards.join(pd.DataFrame(alone).T, on="tool")
-    cards["tool_slowdown"] = cards.tool_wall_s / cards.tool_wall_alone_s
+    cards["tool_slowdown"] = cards.tool_wall_s / cards.tool_wall_paired_alone_s
     cards["decode_slowdown"] = cards.decode_tps_alone / cards.decode_tps_with_tool
     cards.to_csv(out / "cards.csv", index=False, float_format="%.3f")
     print(cards.round(2).to_string(index=False))

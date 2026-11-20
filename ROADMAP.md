@@ -18,17 +18,28 @@ One-step headroom bound 1.06x, unlimited 1.20x. Median end-of-request context is
 
 ## Phase 2 — LLM rates (Nov 20–22)
 
-- [ ] `llama-bench` prefill/decode rate vs context and batch size (`experiments/llm_rates.py`)
-- [ ] Fit `LocalLLM` per (model, ctx) → `results/llm_rates/rates.csv`
-- [ ] Batched decode step time vs N agents × context (KV growth), via `llama-server`
+- [x] `llama-bench` prefill/decode rate vs context and batch size (`experiments/llm_rates.py`) — M4
+- [x] Fit `LocalLLM` per (model, ctx) → `results/llm_rates/rates.csv`; headroom rows added
+- [x] Batched decode step time vs N × context (`llama-batched-bench`) — M4, N ≤ 4
+- [ ] Repeat on M5 Pro and GB10 (full sweep: `uv run experiments/llm_rates.py`)
+
+M4 findings (Qwen3-8B Q4_K_M): decode 19.1 → 11.2 tok/s and prefill 195 → 76 tok/s from 0 → 16k
+context. Batching 4 agents only doubles aggregate decode (18 → 36.5 tok/s at 1k ctx; 11.1 → 21.9
+at 8k). With local LLM times the single-agent bound is 1.05–1.07x one-step, 1.11–1.17x unlimited.
 
 ## Phase 3 — Tool data cards (Nov 21–26)
 
 - [x] Tool suite (`agentsched/toolsuite.py`): `rg`, `clang` build, `pytest`, `pandas`, and
       synthetic tools (sleep, CPU loop, bandwidth kernel)
 - [x] Profiler (`agentsched/profile.py`): CPU %, RSS, wall time, sampled during a run
-- [ ] Interference matrix: tool slowdown under decode, decode slowdown under tool
-      (`experiments/interference.py`)
+- [x] Interference matrix: tool slowdown under decode, decode slowdown under tool
+      (`experiments/interference.py`; measurements paired in time to cancel drift)
+- [ ] Rerun on a machine with active cooling (M4 Air is fanless and throttles; see below)
+
+M4 data cards (preliminary): interference is two-way and asymmetric. `stream` (bandwidth hog)
+slows decode 2.1–2.3x but is itself unaffected; `pandas` (random access, 1 core) slows 2.6–2.9x
+under decode (2x even at 0.85 GB, so not just capacity) while slowing decode only ~1.2x.
+`spin` (pure CPU) and `sleep` do not interact. A scheduler must treat these differently.
 - [x] Map trace calls to suite tools (`TOOLMIX` in `agentsched/replay.py`); work-matched:
       a call of recorded duration D runs round(D / d0) calibrated repetitions
 - [ ] Real-program tools (`grep`, `compile`, `build`, `test`) need `toolsuite setup`, which
@@ -42,7 +53,8 @@ ten threads 91 GB/s. A single CPU tool can take most of the bandwidth decode nee
 - [x] `agentsched/replay.py`: asyncio, N sessions, each step = `llama-server` request with
       the trace's new/output token counts (`ignore_eos`, `n_predict`), then the mapped tool
 - [x] Event log per agent (step start/end, tool start/end) → timeline plot (`experiments/timeline.py`)
-- [ ] Correctness: same tokens per step and tool outputs alone vs in a group
+- [x] Correctness: decoded tokens per step identical alone vs in a group (checked every run,
+      `tokens_match_solo` in summary.csv); smoke test passes at N=1,2 for Naive and Stagger
 - [x] **Ideal**: one Solo pass gives each request's isolated time (`experiments/scaling.py`)
 
 ## Phase 5 — Scaling study (Nov 26–Dec 2)
@@ -64,6 +76,10 @@ ten threads 91 GB/s. A single CPU tool can take most of the bandwidth decode nee
 - [ ] Online policy sensing contention from decode latency
 
 ## Open questions
+
+- Measurement hygiene on laptops: run under `caffeinate -i` (a smoke run was invalidated by
+  sleep), plug in, close other apps, and let the machine cool between sweeps. The M4 Air
+  dropped from 19 to ~8 tok/s decode after ~40 min of load.
 
 - This laptop is an M4 / 16 GB, not the M5 Pro / 24 GB in the proposal. Run M-series numbers
   on whichever machine the final report will cite.

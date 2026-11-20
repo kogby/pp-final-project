@@ -21,7 +21,7 @@ import pandas as pd
 from agentsched.llm import server
 from agentsched.profile import host, profile
 from agentsched.replay import POLICIES, TOOLMIX, Policy, Shape, build_requests, replay, \
-    sample_requests, summarize
+    sample_requests, summarize, tokens_match
 from agentsched.toolsuite import TOOLS
 from agentsched.traces import ROOT, load_steps
 
@@ -44,17 +44,21 @@ def main() -> None:
     ap.add_argument("--chunk", type=int, default=32)
     ap.add_argument("--ctx", type=int, default=8192)
     ap.add_argument("--max-tool-s", type=float, default=30.0)
+    ap.add_argument("--max-out", type=int, default=512, help="cap on decoded tokens per step")
+    ap.add_argument("--max-steps", type=int, default=12)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--no-ideal", action="store_true")
+    ap.add_argument("--tag", default="", help="suffix for the output directory")
     a = ap.parse_args()
 
-    out = ROOT / "results/scaling" / host()
+    out = ROOT / "results/scaling" / (host() + (f"-{a.tag}" if a.tag else ""))
     out.mkdir(parents=True, exist_ok=True)
-    shape = Shape(ctx_cap=a.ctx, max_tool_s=a.max_tool_s)
+    shape = Shape(ctx_cap=a.ctx, max_tool_s=a.max_tool_s, max_out=a.max_out,
+                  max_new=min(2048, a.ctx // 4), system_tokens=min(2048, a.ctx // 4))
     nmax = max(a.n)
 
     steps = load_steps()
-    rids = sample_requests(steps, nmax * a.reqs, seed=a.seed)
+    rids = sample_requests(steps, nmax * a.reqs, seed=a.seed, max_steps=a.max_steps)
     names = {t for v in TOOLMIX[a.mix].values() for t in v}
     tool_s = calibrate(names)
     reqs = build_requests(steps, rids, tool_s, shape, a.mix, a.seed)
@@ -63,11 +67,13 @@ def main() -> None:
         {"args": vars(a), "shape": asdict(shape), "tool_s": tool_s, "request_ids": rids}, indent=1))
 
     rows = []
+    solo_log = None
     if not a.no_ideal:
         with server(1, a.ctx, log=out / "server_solo.log") as url:
             # One agent runs every request back to back: isolated per-request times.
             log = asyncio.run(replay(url, [reqs], Policy(), shape, a.chunk))
         log.to_csv(out / "log_solo.csv", index=False)
+        solo_log = log
         solo = log[log.kind == "request"].assign(active=lambda d: d.t1 - d.t0)
         for n in a.n:
             act = solo[solo.rid.isin([r.rid for agent in per_agent[:n] for r in agent])].active
@@ -81,6 +87,8 @@ def main() -> None:
                 log = asyncio.run(replay(url, per_agent[:n], POLICIES[p](), shape, a.chunk))
             log.to_csv(out / f"log_{p}_N{n}.csv", index=False)
             s = {"policy": p, **summarize(log)}
+            if solo_log is not None:
+                s["tokens_match_solo"] = tokens_match(solo_log, log)
             print(s, flush=True)
             rows.append(s)
             pd.DataFrame(rows).to_csv(out / "summary.csv", index=False)

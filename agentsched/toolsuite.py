@@ -55,6 +55,7 @@ def _tools() -> dict[str, Tool]:
              LLAMA, reset=("cmake", "--build", "build", "--target", "clean")),
         Tool("test", "shell", (PY, "-m", "pytest", "-q", "-x", "-p", "no:cacheprovider"), PYREPO),
         Tool("pandas", "shell", (PY, str(KERNELS / "pandas_job.py"), "25")),
+        Tool("pandas-small", "shell", (PY, str(KERNELS / "pandas_job.py"), "8")),
     ]
     return {t.name: t for t in tools}
 
