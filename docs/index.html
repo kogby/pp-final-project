@@ -31,13 +31,35 @@
     <li><span class="pending">Poster session</span><span class="date">December 11</span></li>
   </ul>
 
+  <h2>Schedule</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th scope="col">Dates</th><th scope="col">Goal</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Nov 9–22</td><td>Done: workload model and single-agent headroom, LLM rate benchmarks, tool suite and profiler, replay runtime with correctness check, Solo/Naive/Stagger/Ideal, first tool profiles on the M4.</td></tr>
+        <tr class="deadline"><td>Nov 23</td><td>Milestone report due.</td></tr>
+        <tr><td>Nov 23–25</td><td>Bring up <code>llama.cpp</code> (CUDA) on the GB10 and run the full rate sweep. Set up the real-program tools and profile them on the M5&nbsp;Pro.</td></tr>
+        <tr><td>Nov 26–29</td><td>Tool profiles for all tools on both machines. Validate Ideal with one agent and measure the overhead of chunked decode.</td></tr>
+        <tr><td>Nov 30–Dec 2</td><td>Sweep the number of agents for Naive and Stagger on both machines. Find what stops scaling on each: capacity, bandwidth, or prefill.</td></tr>
+        <tr><td>Dec 3–6</td><td>Build the tool-aware policy, the admission limit, and core placement on the GB10. Compare against Naive, Stagger, and Ideal.</td></tr>
+        <tr><td>Dec 7–8</td><td>Online policy (stretch) or buffer. Live demo and poster figures.</td></tr>
+        <tr><td>Dec 9–10</td><td>Write the final report.</td></tr>
+        <tr class="deadline"><td>Dec 10</td><td>Final report due.</td></tr>
+        <tr class="deadline"><td>Dec 11</td><td>Poster session.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
   <h2>Updates</h2>
   <!-- Add entries at the top: <li><strong>Month D:</strong> one or two sentences.</li> -->
   <ul>
+    <li><strong>November 23:</strong> Schedule updated. We built the trace workload model and the multi-agent replay runtime, and measured how tools and LLM decoding slow each other on unified memory.</li>
     <li><strong>November 9:</strong> Proposal posted.</li>
   </ul>
 
-  <footer>Last updated November 9, 2026.</footer>
+  <footer>Last updated November 23, 2026.</footer>
 </main>
 </body>
 </html>
